@@ -360,6 +360,7 @@ class Spread:
         unformatted_columns=None,
         formula_columns=None,
         sheet=None,
+        dropna=True,
     ):
         """
         Pull a worksheet into a DataFrame.
@@ -382,6 +383,8 @@ class Spread:
             optional, if you want to open a different sheet first,
             see :meth:`open_sheet <gspread_pandas.spread.Spread.open_sheet>`
             (default None)
+        dropna : bool
+            whether to remove rows where everything is null (default True)
 
         Returns
         -------
@@ -396,12 +399,15 @@ class Spread:
         col_names = parse_sheet_headers(vals, header_rows)
 
         # remove rows where everything is null, then replace nulls with ''
-        df = (
-            pd.DataFrame(vals[header_rows or 0 :])
-            .replace("", np.nan)
-            .dropna(how="all")
-            .fillna("")
-        )
+        if dropna:
+            df = (
+                pd.DataFrame(vals[header_rows or 0 :])
+                .replace("", np.nan)
+                .dropna(how="all")
+                .fillna("")
+            )
+        else: # do not remove rows where everything is null
+            df = pd.DataFrame(vals[header_rows or 0 :]).fillna("")
 
         # replace values with a different value render option before we set the
         # index in set_col_names
