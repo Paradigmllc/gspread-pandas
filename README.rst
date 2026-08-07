@@ -114,8 +114,8 @@ Or clone the repo:
 
 .. code-block:: console
 
-    $ git clone https://github.com/aiguofer/gspread-pandas.git
-    $ python setup.py install
+    $ git clone https://github.com/Paradigmllc/gspread-pandas.git
+    $ pip install .
 
 Before using, you will need to download Google client credentials for
 your app.

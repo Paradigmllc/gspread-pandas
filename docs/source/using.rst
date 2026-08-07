@@ -57,3 +57,54 @@ Some of the most useful functions are:
 - ``move``: Move the Spreadsheet to a different location
 
 You can read more :class:`in the docs for the Spread object <gspread_pandas.spread.Spread>`.
+
+Sheets that don't match the shape you assumed
+---------------------------------------------
+
+Sheets that people actually maintain drift. A column gets renamed between
+exports, someone adds a title row above the table, every value arrives as text.
+Three options on the functions above handle that, and all of them work with no
+configuration at all.
+
+``convert_types`` gives columns their real dtypes instead of leaving everything
+as ``object``. A column is only converted when *every* non-empty value in it
+converts cleanly, so a column that is 99% numbers and one ``N/A`` stays as text
+rather than quietly nulling that row::
+
+    df = spread.sheet_to_df(convert_types=True)
+
+``detect_layout`` finds where the table starts, for sheets that open with a
+report title, a blank row, or a note to the team::
+
+    df = spread.sheet_to_df(detect_layout=True)
+
+``append`` adds rows below the data already in a sheet, matching your columns to
+the headers that are there. A reordered or renamed DataFrame still lands in the
+right place instead of being written positionally::
+
+    spread.df_to_sheet(new_rows, append=True)
+
+Optional: better matching with a model
+``````````````````````````````````````
+
+Each of the three falls back to exact matching, similarity and strict type
+inference, which covers most sheets on its own. Setting an API key additionally
+lets them handle renames that don't look alike (``revenue`` to ``Sales Total``),
+stacked headers, and columns whose type only makes sense from the name::
+
+    export GSPREAD_PANDAS_AI_API_KEY=...
+    export GSPREAD_PANDAS_AI_BASE_URL=https://api.deepseek.com/v1  # default
+    export GSPREAD_PANDAS_AI_MODEL=deepseek-chat                   # default
+
+Any OpenAI-compatible endpoint works, so DeepSeek, OpenAI, OpenRouter, LiteLLM
+and a local Ollama are all reachable by changing the base URL. No extra packages
+are needed.
+
+The model is only ever asked for a small structured answer: a column-to-header
+mapping, a header row number, a type name from a fixed list. Nothing it returns
+is executed, and anything naming a column, header or type that isn't really
+there is discarded. A proposed type still has to survive the same strict
+conversion as everything else. So a wrong answer costs you a match, never a
+wrong value in a cell. Only column names and a bounded sample of rows are ever
+sent, and sheet contents are treated as untrusted data rather than as
+instructions.
