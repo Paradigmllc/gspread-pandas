@@ -402,7 +402,7 @@ class Client(ClientV4):
         self.refresh_directories()
         return parent
 
-    def move_file(self, file_id, path, create=False):
+    def move_file(self, file_id, path="/", create=False, folder_id=None):
         """
         Move a file to the given path.
 
@@ -415,20 +415,26 @@ class Client(ClientV4):
             the path will start with `<Shared Drive Name>/` (no leading /)
         create : bool
             whether to create any missing folders (Default value = False)
+        folder_id : str
+            optional, id of the destination folder, used instead of ``path``.
+            Names aren't unique in Drive and a folder shared with you may not
+            show up in a path lookup at all, so an id is the only way to name
+            some destinations (Default value = None)
 
         Returns
         -------
         """
-        if path == "/":
-            folder_id = "root"
-        else:
-            parent, missing = folders_to_create(path, self._get_dirs(False))
-            if missing:
-                if not create:
-                    raise Exception("Folder does not exist")
+        if folder_id is None:
+            if path == "/":
+                folder_id = "root"
+            else:
+                parent, missing = folders_to_create(path, self._get_dirs(False))
+                if missing:
+                    if not create:
+                        raise Exception("Folder does not exist")
 
-                parent = self.create_folder(path)
-            folder_id = parent["id"]
+                    parent = self.create_folder(path)
+                folder_id = parent["id"]
 
         old_parents = self._drive_request(
             "get", file_id, params={"fields": "parents"}

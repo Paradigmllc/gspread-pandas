@@ -544,6 +544,23 @@ def is_int(val):
     return isinstance(val, (int, np.integer))
 
 
+def expand_all_columns(cols, width):
+    """
+    Turn the ``-1`` shorthand into every column position.
+
+    ``-1`` rather than a word like "all", because these arguments accept column
+    names as well as numbers, and any word could be somebody's column name.
+    Column numbers are 1-based, so -1 can't be one.
+    """
+    if is_int(cols):
+        cols = [cols]
+
+    if list(cols) == [-1]:
+        return list(range(1, width + 1))
+
+    return cols
+
+
 def is_indexes(lst):
     """Is this a list of indexes (all ints)"""
     return all([is_int(val) for val in lst])

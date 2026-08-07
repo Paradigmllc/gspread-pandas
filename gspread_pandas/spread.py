@@ -1,7 +1,6 @@
 from builtins import range, str
 from re import match
 
-import numpy as np
 import pandas as pd
 from gspread import Spreadsheet, Worksheet
 from gspread.exceptions import (
@@ -36,6 +35,7 @@ from gspread_pandas.util import (
     create_merge_headers_request,
     create_merge_index_request,
     create_unmerge_cells_request,
+    expand_all_columns,
     fillna,
     find_col_indexes,
     get_cell_as_tuple,
@@ -382,10 +382,10 @@ class Spread:
             row number for first row of headers or data (default 1)
         unformatted_columns : list
             column numbers or names for columns you'd like to pull in as
-            unformatted values (defaul [])
+            unformatted values, or ``-1`` for every column (default None)
         formula_columns : list
             column numbers or names for columns you'd like to pull in as
-            actual formulas (defaul [])
+            actual formulas, or ``-1`` for every column (default None)
         sheet : str,int
             optional, if you want to open a different sheet first,
             see :meth:`open_sheet <gspread_pandas.spread.Spread.open_sheet>`
@@ -427,16 +427,16 @@ class Spread:
 
         col_names = parse_sheet_headers(vals, header_rows)
 
-        # remove rows where everything is null, then replace nulls with ''
+        df = pd.DataFrame(vals[header_rows or 0 :])
+
+        # drop rows where every cell is blank, by masking rather than by
+        # replacing blanks with NaN -- an all-blank column would become
+        # all-NaN, which pandas silently downcasts off object dtype (#102)
         if dropna:
-            df = (
-                pd.DataFrame(vals[header_rows or 0 :])
-                .replace("", np.nan)
-                .dropna(how="all")
-                .fillna("")
-            )
-        else:  # do not remove rows where everything is null
-            df = pd.DataFrame(vals[header_rows or 0 :]).fillna("")
+            blank = df.isna() | (df == "")
+            df = df[~blank.all(axis=1)]
+
+        df = df.fillna("")
 
         # replace values with a different value render option before we set the
         # index in set_col_names
@@ -445,7 +445,7 @@ class Spread:
                 df,
                 header_rows + start_row - 1,
                 col_names,
-                unformatted_columns,
+                expand_all_columns(unformatted_columns, len(df.columns)),
                 ValueRenderOption.unformatted,
             )
 
@@ -454,7 +454,7 @@ class Spread:
                 df,
                 header_rows + start_row - 1,
                 col_names,
-                formula_columns,
+                expand_all_columns(formula_columns, len(df.columns)),
                 ValueRenderOption.formula,
             )
 
@@ -1162,7 +1162,7 @@ class Spread:
         """
         return self.client.list_permissions(self.spread.id)
 
-    def move(self, path="/", create=True):
+    def move(self, path="/", create=True, folder_id=None):
         """
         Move the current spreadsheet to the specified path in your Google drive. If the
         file is not currently in you drive, it will be added.
@@ -1173,8 +1173,12 @@ class Spread:
             folder path (Default value = "/")
         create : bool
             if true, create folders as needed (Default value = True)
+        folder_id : str
+            optional, id of the destination folder, used instead of ``path``,
+            see :meth:`move_file <gspread_pandas.client.Client.move_file>`
+            (Default value = None)
 
         Returns
         -------
         """
-        self.client.move_file(self.spread.id, path, create)
+        self.client.move_file(self.spread.id, path, create, folder_id)

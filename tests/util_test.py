@@ -472,3 +472,22 @@ def test_folders_to_create():
 
     for test in tests:
         assert util.folders_to_create(test[TEST], dirs) == test[ANSWER]
+
+
+@pytest.mark.parametrize(
+    "cols,expected",
+    [
+        (-1, [1, 2, 3]),
+        ([-1], [1, 2, 3]),
+        ([1, 2], [1, 2]),
+        (["Total"], ["Total"]),
+        ([], []),
+    ],
+)
+def test_expand_all_columns(cols, expected):
+    assert list(util.expand_all_columns(cols, 3)) == expected
+
+
+def test_expand_all_columns_leaves_a_pandas_index_alone():
+    cols = pd.Index(["a", "b"])
+    assert list(util.expand_all_columns(cols, 3)) == ["a", "b"]

@@ -22,6 +22,10 @@ Added
 - Optional use of an OpenAI-compatible model for the harder cases of all
   three, enabled with ``GSPREAD_PANDAS_AI_API_KEY``. Adds no dependencies,
   and every feature works without it
+- ``-1`` for ``unformatted_columns`` and ``formula_columns`` on
+  ``Spread.sheet_to_df``, meaning every column (thanks @ChristophBoerlin, #56)
+- ``folder_id`` for ``Client.move_file`` and ``Spread.move``, for destinations
+  a path can't name (thanks @dtquandt, #48)
 
 Changed
 -------
@@ -38,6 +42,9 @@ Fixed
 - ``Client.expiry`` and ``http_client.login()`` no longer fail with
   ``AttributeError``; gspread only records ``auth`` when it builds the session
   itself, and gspread-pandas always passes one in
+- ``Spread.sheet_to_df`` no longer raises a pandas ``FutureWarning`` about
+  silent downcasting when a sheet has a column of blanks (thanks
+  @IvanKaramazov, #102, #103)
 
 [3.3.0] - 2024-02-13
 -----------------------------
