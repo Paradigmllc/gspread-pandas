@@ -150,7 +150,7 @@ def chunks(lst, chunk_size):
 
 def deprecate(message):
     """Display message about deprecation."""
-    global DEPRECATION_WARNINGS_ENABLED, _WARNINGS_ALREADY_ENABLED
+    global _WARNINGS_ALREADY_ENABLED
     # force enable DeprecationWarnings since most interactive shells have
     # them disabled
     if DEPRECATION_WARNINGS_ENABLED and not _WARNINGS_ALREADY_ENABLED:
