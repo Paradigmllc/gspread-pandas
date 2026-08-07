@@ -64,9 +64,14 @@ def test_ragged_rows_are_padded_with_blanks():
 
 
 def test_values_stay_strings():
+    """Reading must not guess at types; that is what convert_types is for.
+
+    Checked by value rather than by dtype, since pandas 3 gives strings their
+    own dtype instead of parking them in object.
+    """
     df = read([["one", "two"], ["1", "2"], ["", ""], ["3", "4"]], index=0)
-    assert df.dtypes.tolist() == [object, object]
     assert df.values.tolist() == [["1", "2"], ["3", "4"]]
+    assert all(isinstance(value, str) for value in df["one"])
 
 
 def test_blank_column_survives_as_blanks():

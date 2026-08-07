@@ -37,7 +37,7 @@ class TestSpread:
 
         assert isinstance(df.columns, pd.MultiIndex)
         assert df.shape == (3, 9)
-        assert df["Total"][0].startswith("=")
+        assert df["Total"].iloc[0].startswith("=")
 
         self.spread.df_to_sheet(
             df,
