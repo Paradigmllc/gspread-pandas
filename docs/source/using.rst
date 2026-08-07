@@ -55,6 +55,7 @@ Some of the most useful functions are:
 - ``add_permissions``: Add multiple permissions to a Spreadsheet
 - ``list_permissions``: Show all current permissions on the Spreadsheet
 - ``move``: Move the Spreadsheet to a different location
+- ``reorder_sheets``: Put the Worksheets in a given order
 
 You can read more :class:`in the docs for the Spread object <gspread_pandas.spread.Spread>`.
 
