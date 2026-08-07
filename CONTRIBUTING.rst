@@ -6,12 +6,12 @@ takes care of it for you, but you need to have Python 3 installed to be able to 
 black. To contribute, please fork the repo, create a feature branch, push it to your
 repo, then create a pull request.
 
-To install and set up the environment after you fork it (replace `aiguofer` with your
-username):
+To install and set up the environment after you fork it (replace `Paradigmllc` with
+your username):
 
 .. code-block:: console
 
-    $ git clone https://github.com/aiguofer/gspread-pandas.git && cd gspread-pandas
+    $ git clone https://github.com/Paradigmllc/gspread-pandas.git && cd gspread-pandas
     $ pip install -e ".[dev]"
     $ pre-commit install
 
