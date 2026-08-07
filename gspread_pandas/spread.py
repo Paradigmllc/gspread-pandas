@@ -640,14 +640,22 @@ class Spread:
         row_resize = max(rows, frozen_rows + 1)
         col_resize = max(cols, frozen_cols + 1)
 
-        # resize to smallest possible size first
+        # Values are cleared by shrinking the sheet, which deletes them, and
+        # growing it back. A sheet can't shrink past its frozen rows and
+        # columns, though, so that block survives and has to be cleared by hand.
         # https://issuetracker.google.com/issues/213126648
         # TODO: these 2 operations could be done in a single batchUpdate call
-        self.sheet.resize(frozen_rows + 1, frozen_cols + 1)
+        kept_rows = frozen_rows + 1
+        kept_cols = frozen_cols + 1
+
+        self.sheet.resize(kept_rows, kept_cols)
         self.sheet.resize(row_resize, col_resize)
 
-        # clear the value on the first cell since it didn't get deleted above
-        self.update_cells(start=(1, 1), end=(1, 1), vals=[""])
+        self.update_cells(
+            start=(1, 1),
+            end=(kept_rows, kept_cols),
+            vals=[""] * (kept_rows * kept_cols),
+        )
 
     def delete_sheet(self, sheet):
         """

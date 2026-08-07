@@ -95,6 +95,11 @@ def get_config(conf_dir=None, file_name=_default_file):
     with cfg_file.open() as fp:
         cfg = json.load(fp)
 
+    # Documented since this function was written, but never actually set, so
+    # pointing conf_dir somewhere custom used to leave credentials in the
+    # default location anyway (#104).
+    cfg["creds_dir"] = conf_dir / "creds"
+
     return cfg
 
 
@@ -144,9 +149,18 @@ def get_creds(
             )
 
         if creds_dir is None:
-            creds_dir = get_config_dir() / "creds"
+            creds_dir = config.get("creds_dir") or get_config_dir() / "creds"
 
         creds_file = Path(creds_dir) / user
+
+        if not creds_file.exists():
+            # Until this was fixed, creds went to the default location no
+            # matter what conf_dir said. Read from there rather than sending
+            # anyone who already had credentials back through the OAuth flow,
+            # which would hang a headless script.
+            legacy_file = get_config_dir() / "creds" / user
+            if legacy_file.exists():
+                creds_file = legacy_file
 
         if creds_file.exists():
             # need to convert Path to string for python 2.7
