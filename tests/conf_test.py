@@ -26,8 +26,8 @@ class Test_get_config:
     def test_with_oauth(self, oauth_config):
         c = conf.get_config(*oauth_config)
         assert isinstance(c, dict)
-        assert len(c) == 1
-        assert len(c[list(c.keys())[0]]) > 1
+        assert set(c) == {"installed", "creds_dir"}
+        assert len(c["installed"]) > 1
 
     def test_with_sa(self, sa_config):
         c = conf.get_config(*sa_config)

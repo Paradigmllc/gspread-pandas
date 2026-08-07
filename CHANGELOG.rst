@@ -9,6 +9,20 @@ and this project adheres to `Semantic Versioning <http://semver.org/>`_.
 [Unreleased]
 ------------
 
+Fixed
+-----
+
+- ``Spread.clear_sheet`` left the frozen rows and columns populated. Clearing
+  works by shrinking the sheet and growing it back, but a sheet can't shrink
+  past its frozen block, so that block survived and only ``A1`` was cleared
+  (#97)
+- ``get_config`` now sets ``creds_dir``, and ``get_creds`` now reads it. Both
+  were documented from the start and neither was implemented, so pointing
+  ``conf_dir`` somewhere custom — or setting ``creds_dir`` by hand, as the
+  docstring suggested — silently left credentials in the default location
+  (#104). Credentials already in the old location are still read, so nobody
+  is sent back through the OAuth flow
+
 [4.0.0] - 2026-08-07
 -----------------------------
 
