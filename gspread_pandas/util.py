@@ -5,7 +5,6 @@ from time import sleep
 import numpy as np
 import pandas as pd
 from google.oauth2 import credentials as oauth2, service_account
-from gspread.client import Client as ClientV4
 from gspread.exceptions import APIError
 from gspread.utils import a1_to_rowcol, rowcol_to_a1
 
@@ -284,27 +283,28 @@ def create_unmerge_cells_request(sheet_id, start, end):
 
 
 def monkey_patch_request(client, retry_delay=10):
-    """Monkey patch gspread's Client.request to auto-retry with a delay when you get a
-    100 seconds RESOURCE_EXCHAUSTED error."""
+    """Monkey patch gspread's HTTPClient.request to auto-retry with a delay when you
+    get a 100 seconds RESOURCE_EXCHAUSTED error."""
+    http_client = client.http_client
+    original_request = http_client.request
 
     def request(*args, **kwargs):
         try:
-            return ClientV4.request(client, *args, **kwargs)
+            return original_request(*args, **kwargs)
         except APIError as e:
-            error = str(e)
+            # gspread 6 drops the status field from APIError.__str__, so read the
+            # structured error instead of matching against the string
+            error = getattr(e, "error", None) or {}
+            message = error.get("message", "")
             # Only retry on 100 seconds quota breaches
-            if "RESOURCE_EXHAUSTED" in error and (
-                "100" in error or "Read requests" in error
+            if error.get("status") == "RESOURCE_EXHAUSTED" and (
+                "100" in message or "Read requests" in message
             ):
                 sleep(retry_delay)
                 return request(*args, **kwargs)
-            else:
-                error = e
+            raise
 
-        if "error" in locals():
-            raise error
-
-    client.request = request
+    http_client.request = request
 
 
 def create_merge_headers_request(sheet_id, headers, start, index_size):

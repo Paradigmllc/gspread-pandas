@@ -91,6 +91,10 @@ class Client(ClientV4):
             session = AuthorizedSession(credentials)
         super().__init__(credentials, session)
 
+        # gspread's HTTPClient only records auth when it builds the session itself,
+        # so client.expiry and http_client.login() break when a session is passed in
+        self.http_client.auth = credentials
+
         monkey_patch_request(self)
 
         self._root = self._drive_request(file_id="root", params={"fields": "name,id"})
@@ -134,7 +138,7 @@ class Client(ClientV4):
         """`(str)` - E-mail for the currently authenticated user"""
         if not self._email:
             try:
-                self._email = self.request(
+                self._email = self.http_client.request(
                     "get", "https://www.googleapis.com/userinfo/v2/me"
                 ).json()["email"]
             except Exception:
@@ -194,7 +198,7 @@ class Client(ClientV4):
         if file_id:
             url += "/{}".format(file_id)
         try:
-            res = self.request(method, url, params=params, json=data)
+            res = self.http_client.request(method, url, params=params, json=data)
             if res.text:
                 return res.json()
         except APIError as e:
@@ -233,7 +237,7 @@ class Client(ClientV4):
             # Drive uses different terminology
             properties["title"] = properties["name"]
 
-            return Spreadsheet(self, properties)
+            return Spreadsheet(self.http_client, properties)
         except StopIteration:
             raise SpreadsheetNotFound
 
