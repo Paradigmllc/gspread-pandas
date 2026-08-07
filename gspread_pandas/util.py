@@ -5,7 +5,6 @@ from time import sleep
 import numpy as np
 import pandas as pd
 from google.oauth2 import credentials as oauth2, service_account
-from gspread.client import Client as ClientV4
 from gspread.exceptions import APIError
 from gspread.utils import a1_to_rowcol, rowcol_to_a1
 
@@ -151,7 +150,7 @@ def chunks(lst, chunk_size):
 
 def deprecate(message):
     """Display message about deprecation."""
-    global DEPRECATION_WARNINGS_ENABLED, _WARNINGS_ALREADY_ENABLED
+    global _WARNINGS_ALREADY_ENABLED
     # force enable DeprecationWarnings since most interactive shells have
     # them disabled
     if DEPRECATION_WARNINGS_ENABLED and not _WARNINGS_ALREADY_ENABLED:
@@ -284,27 +283,28 @@ def create_unmerge_cells_request(sheet_id, start, end):
 
 
 def monkey_patch_request(client, retry_delay=10):
-    """Monkey patch gspread's Client.request to auto-retry with a delay when you get a
-    100 seconds RESOURCE_EXCHAUSTED error."""
+    """Monkey patch gspread's HTTPClient.request to auto-retry with a delay when you
+    get a 100 seconds RESOURCE_EXCHAUSTED error."""
+    http_client = client.http_client
+    original_request = http_client.request
 
     def request(*args, **kwargs):
         try:
-            return ClientV4.request(client, *args, **kwargs)
+            return original_request(*args, **kwargs)
         except APIError as e:
-            error = str(e)
+            # gspread 6 drops the status field from APIError.__str__, so read the
+            # structured error instead of matching against the string
+            error = getattr(e, "error", None) or {}
+            message = error.get("message", "")
             # Only retry on 100 seconds quota breaches
-            if "RESOURCE_EXHAUSTED" in error and (
-                "100" in error or "Read requests" in error
+            if error.get("status") == "RESOURCE_EXHAUSTED" and (
+                "100" in message or "Read requests" in message
             ):
                 sleep(retry_delay)
                 return request(*args, **kwargs)
-            else:
-                error = e
+            raise
 
-        if "error" in locals():
-            raise error
-
-    client.request = request
+    http_client.request = request
 
 
 def create_merge_headers_request(sheet_id, headers, start, index_size):
@@ -542,6 +542,23 @@ def get_ranges(sheet_name, cols):
 
 def is_int(val):
     return isinstance(val, (int, np.integer))
+
+
+def expand_all_columns(cols, width):
+    """
+    Turn the ``-1`` shorthand into every column position.
+
+    ``-1`` rather than a word like "all", because these arguments accept column
+    names as well as numbers, and any word could be somebody's column name.
+    Column numbers are 1-based, so -1 can't be one.
+    """
+    if is_int(cols):
+        cols = [cols]
+
+    if list(cols) == [-1]:
+        return list(range(1, width + 1))
+
+    return cols
 
 
 def is_indexes(lst):

@@ -55,3 +55,6 @@ output/
 .python-version*
 
 google_secret.json
+.venv/
+build/
+*.egg-info/

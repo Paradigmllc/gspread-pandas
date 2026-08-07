@@ -1,7 +1,6 @@
 from builtins import range, str
 from re import match
 
-import numpy as np
 import pandas as pd
 from gspread import Spreadsheet, Worksheet
 from gspread.exceptions import (
@@ -12,12 +11,17 @@ from gspread.exceptions import (
 )
 from gspread.utils import ValueInputOption, ValueRenderOption, fill_gaps, rightpad
 
+from gspread_pandas.clean import convert_types as convert_column_types
 from gspread_pandas.client import Client
 from gspread_pandas.conf import default_scope
 from gspread_pandas.exceptions import (
     GspreadPandasException,
     MissMatchException,
     NoWorksheetException,
+)
+from gspread_pandas.smart import (
+    detect_structure,
+    match_columns as match_columns_to_headers,
 )
 from gspread_pandas.util import (
     COL,
@@ -31,6 +35,7 @@ from gspread_pandas.util import (
     create_merge_headers_request,
     create_merge_index_request,
     create_unmerge_cells_request,
+    expand_all_columns,
     fillna,
     find_col_indexes,
     get_cell_as_tuple,
@@ -361,6 +366,8 @@ class Spread:
         formula_columns=None,
         sheet=None,
         dropna=True,
+        detect_layout=False,
+        convert_types=False,
     ):
         """
         Pull a worksheet into a DataFrame.
@@ -375,16 +382,32 @@ class Spread:
             row number for first row of headers or data (default 1)
         unformatted_columns : list
             column numbers or names for columns you'd like to pull in as
-            unformatted values (defaul [])
+            unformatted values, or ``-1`` for every column (default None)
         formula_columns : list
             column numbers or names for columns you'd like to pull in as
-            actual formulas (defaul [])
+            actual formulas, or ``-1`` for every column (default None)
         sheet : str,int
             optional, if you want to open a different sheet first,
             see :meth:`open_sheet <gspread_pandas.spread.Spread.open_sheet>`
             (default None)
         dropna : bool
             whether to remove rows where everything is null (default True)
+        detect_layout : bool
+            whether to work out ``start_row`` and ``header_rows`` from the
+            sheet instead of using the values passed in, for sheets that open
+            with a title or a blank row before the table. Uses the configured
+            model when ``GSPREAD_PANDAS_AI_API_KEY`` is set and falls back to
+            skipping preamble rows otherwise, see
+            :func:`detect_structure <gspread_pandas.smart.detect_structure>`
+            (default False)
+        convert_types : bool
+            whether to give columns their real types instead of leaving
+            everything as strings. A column is only converted when every
+            non-empty value in it converts cleanly. Uses the configured model
+            for columns strict inference can't place when
+            ``GSPREAD_PANDAS_AI_API_KEY`` is set, see
+            :func:`convert_types <gspread_pandas.clean.convert_types>`
+            (default False)
 
         Returns
         -------
@@ -394,20 +417,26 @@ class Spread:
         self._ensure_sheet(sheet)
 
         vals = self.sheet.get_all_values()
+
+        if detect_layout:
+            layout = detect_structure(vals)
+            start_row = layout["start_row"]
+            header_rows = layout["header_rows"] if header_rows else header_rows
+
         vals = self._fix_merge_values(vals)[start_row - 1 :]
 
         col_names = parse_sheet_headers(vals, header_rows)
 
-        # remove rows where everything is null, then replace nulls with ''
+        df = pd.DataFrame(vals[header_rows or 0 :])
+
+        # drop rows where every cell is blank, by masking rather than by
+        # replacing blanks with NaN -- an all-blank column would become
+        # all-NaN, which pandas silently downcasts off object dtype (#102)
         if dropna:
-            df = (
-                pd.DataFrame(vals[header_rows or 0 :])
-                .replace("", np.nan)
-                .dropna(how="all")
-                .fillna("")
-            )
-        else: # do not remove rows where everything is null
-            df = pd.DataFrame(vals[header_rows or 0 :]).fillna("")
+            blank = df.isna() | (df == "")
+            df = df[~blank.all(axis=1)]
+
+        df = df.fillna("")
 
         # replace values with a different value render option before we set the
         # index in set_col_names
@@ -416,7 +445,7 @@ class Spread:
                 df,
                 header_rows + start_row - 1,
                 col_names,
-                unformatted_columns,
+                expand_all_columns(unformatted_columns, len(df.columns)),
                 ValueRenderOption.unformatted,
             )
 
@@ -425,11 +454,14 @@ class Spread:
                 df,
                 header_rows + start_row - 1,
                 col_names,
-                formula_columns,
+                expand_all_columns(formula_columns, len(df.columns)),
                 ValueRenderOption.formula,
             )
 
         df = set_col_names(df, col_names)
+
+        if convert_types:
+            df = convert_column_types(df)
 
         return parse_sheet_index(df, index)
 
@@ -668,6 +700,8 @@ class Spread:
         merge_headers=False,
         flatten_headers_sep=None,
         merge_index=False,
+        append=False,
+        match_columns=None,
     ):
         """
         Save a DataFrame into a worksheet.
@@ -712,12 +746,33 @@ class Spread:
         merge_index : bool
             whether to merge cells in the index that have the same value
             (default False)
+        append : bool
+            whether to add the rows below the data already in the sheet
+            instead of overwriting from ``start``. Columns are matched to the
+            existing headers by name, so a reordered or renamed DataFrame
+            still lands under the right headers. Can't be used with
+            ``replace`` (default False)
+        match_columns : bool
+            optional, when appending, whether to use the configured model to
+            resolve column names that don't match exactly. Defaults to using
+            it whenever ``GSPREAD_PANDAS_AI_API_KEY`` is set; pass False to
+            stay with exact and similarity matching only, see
+            :mod:`smart <gspread_pandas.smart>` (default None)
 
         Returns
         -------
         None
         """
         self._ensure_sheet(sheet)
+
+        start = get_cell_as_tuple(start)
+
+        if append:
+            if replace:
+                raise ValueError("Can't both append to and replace a sheet")
+            df, start, aligned = self._align_for_append(df, index, start, match_columns)
+            if aligned:
+                index = headers = False
 
         include_index = index
         header = df.columns
@@ -737,7 +792,8 @@ class Spread:
             )
             df_list = header_rows + df_list
 
-        start = get_cell_as_tuple(start)
+        if not df_list:
+            return
 
         sheet_rows, sheet_cols = self.get_sheet_dims()
         req_rows = len(df_list) + (start[ROW] - 1)
@@ -785,6 +841,51 @@ class Spread:
             self._merge_index(start, index, header_size, "index")
 
         self.refresh_spread_metadata()
+
+    def _align_for_append(self, df, include_index, start, match_columns):
+        """
+        Reshape a DataFrame to sit under the headers already in the worksheet.
+
+        Returns the reshaped frame, the cell to start writing at, and whether
+        any alignment happened. A sheet with no header row yet is left alone so
+        the caller writes it out normally, headers and all.
+        """
+        existing = self.sheet.get_all_values()
+        header_row = start[ROW] - 1
+
+        sheet_headers = (
+            existing[header_row][start[COL] - 1 :]
+            if (len(existing) > header_row)
+            else []
+        )
+        while sheet_headers and sheet_headers[-1] == "":
+            sheet_headers.pop()
+
+        if not sheet_headers:
+            return df, start, False
+
+        if include_index:
+            df = df.reset_index()
+
+        mapping = match_columns_to_headers(
+            df.columns,
+            sheet_headers,
+            sample_rows=df.head().astype(str).values.tolist(),
+            use_ai=match_columns,
+        )
+        source = {
+            header: column for column, header in mapping.items() if header is not None
+        }
+
+        # Numbered columns, because a sheet is free to repeat a header name and
+        # positions are all that matter once the values are written out.
+        columns = [
+            df[source[header]].tolist() if header in source else [None] * len(df)
+            for header in sheet_headers
+        ]
+        aligned = pd.DataFrame(list(zip(*columns)), columns=range(len(sheet_headers)))
+
+        return aligned, (len(existing) + 1, start[COL]), True
 
     def _merge_index(self, start, index, other_axis_size, axis):
         """
@@ -1061,7 +1162,7 @@ class Spread:
         """
         return self.client.list_permissions(self.spread.id)
 
-    def move(self, path="/", create=True):
+    def move(self, path="/", create=True, folder_id=None):
         """
         Move the current spreadsheet to the specified path in your Google drive. If the
         file is not currently in you drive, it will be added.
@@ -1072,8 +1173,12 @@ class Spread:
             folder path (Default value = "/")
         create : bool
             if true, create folders as needed (Default value = True)
+        folder_id : str
+            optional, id of the destination folder, used instead of ``path``,
+            see :meth:`move_file <gspread_pandas.client.Client.move_file>`
+            (Default value = None)
 
         Returns
         -------
         """
-        self.client.move_file(self.spread.id, path, create)
+        self.client.move_file(self.spread.id, path, create, folder_id)

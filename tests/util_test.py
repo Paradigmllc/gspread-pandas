@@ -285,11 +285,12 @@ def test_monkey_patch_request(betamax_authorizedsession):
     c = Client(betamax_authorizedsession.credentials, betamax_authorizedsession)
     s = c.open_by_key(DEMO_SHEET)
 
-    # error gets turned into multiple lines by prettyjson serializer in betamax
-    # need to a regex class that includes newlines
-    with pytest.raises(APIError, match=r".*Read requests.*RESOURCE_EXHAUSTED.*"):
+    with pytest.raises(APIError) as excinfo:
         for i in range(200):
             s.fetch_sheet_metadata()
+
+    assert excinfo.value.error["status"] == "RESOURCE_EXHAUSTED"
+    assert "Read requests" in excinfo.value.error["message"]
 
     retry_delay = 10 if pytest.RECORD else 0
 
@@ -316,7 +317,7 @@ def test_get_col_merge_ranges():
 
 def test_fillna(df):
     df.loc[2] = [None, None]
-    df.loc[3] = [np.NaN, np.NaN]
+    df.loc[3] = [np.nan, np.nan]
     df["col1"] = df["col1"].astype("category")
 
     assert (
@@ -471,3 +472,22 @@ def test_folders_to_create():
 
     for test in tests:
         assert util.folders_to_create(test[TEST], dirs) == test[ANSWER]
+
+
+@pytest.mark.parametrize(
+    "cols,expected",
+    [
+        (-1, [1, 2, 3]),
+        ([-1], [1, 2, 3]),
+        ([1, 2], [1, 2]),
+        (["Total"], ["Total"]),
+        ([], []),
+    ],
+)
+def test_expand_all_columns(cols, expected):
+    assert list(util.expand_all_columns(cols, 3)) == expected
+
+
+def test_expand_all_columns_leaves_a_pandas_index_alone():
+    cols = pd.Index(["a", "b"])
+    assert list(util.expand_all_columns(cols, 3)) == ["a", "b"]
