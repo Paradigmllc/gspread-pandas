@@ -19,6 +19,7 @@ from gspread_pandas.exceptions import (
     MissMatchException,
     NoWorksheetException,
 )
+from gspread_pandas.smart import match_columns as match_columns_to_headers
 from gspread_pandas.util import (
     COL,
     ROW,
@@ -406,7 +407,7 @@ class Spread:
                 .dropna(how="all")
                 .fillna("")
             )
-        else: # do not remove rows where everything is null
+        else:  # do not remove rows where everything is null
             df = pd.DataFrame(vals[header_rows or 0 :]).fillna("")
 
         # replace values with a different value render option before we set the
@@ -668,6 +669,8 @@ class Spread:
         merge_headers=False,
         flatten_headers_sep=None,
         merge_index=False,
+        append=False,
+        match_columns=None,
     ):
         """
         Save a DataFrame into a worksheet.
@@ -712,12 +715,33 @@ class Spread:
         merge_index : bool
             whether to merge cells in the index that have the same value
             (default False)
+        append : bool
+            whether to add the rows below the data already in the sheet
+            instead of overwriting from ``start``. Columns are matched to the
+            existing headers by name, so a reordered or renamed DataFrame
+            still lands under the right headers. Can't be used with
+            ``replace`` (default False)
+        match_columns : bool
+            optional, when appending, whether to use the configured model to
+            resolve column names that don't match exactly. Defaults to using
+            it whenever ``GSPREAD_PANDAS_AI_API_KEY`` is set; pass False to
+            stay with exact and similarity matching only, see
+            :mod:`smart <gspread_pandas.smart>` (default None)
 
         Returns
         -------
         None
         """
         self._ensure_sheet(sheet)
+
+        start = get_cell_as_tuple(start)
+
+        if append:
+            if replace:
+                raise ValueError("Can't both append to and replace a sheet")
+            df, start, aligned = self._align_for_append(df, index, start, match_columns)
+            if aligned:
+                index = headers = False
 
         include_index = index
         header = df.columns
@@ -737,7 +761,8 @@ class Spread:
             )
             df_list = header_rows + df_list
 
-        start = get_cell_as_tuple(start)
+        if not df_list:
+            return
 
         sheet_rows, sheet_cols = self.get_sheet_dims()
         req_rows = len(df_list) + (start[ROW] - 1)
@@ -785,6 +810,51 @@ class Spread:
             self._merge_index(start, index, header_size, "index")
 
         self.refresh_spread_metadata()
+
+    def _align_for_append(self, df, include_index, start, match_columns):
+        """
+        Reshape a DataFrame to sit under the headers already in the worksheet.
+
+        Returns the reshaped frame, the cell to start writing at, and whether
+        any alignment happened. A sheet with no header row yet is left alone so
+        the caller writes it out normally, headers and all.
+        """
+        existing = self.sheet.get_all_values()
+        header_row = start[ROW] - 1
+
+        sheet_headers = (
+            existing[header_row][start[COL] - 1 :]
+            if (len(existing) > header_row)
+            else []
+        )
+        while sheet_headers and sheet_headers[-1] == "":
+            sheet_headers.pop()
+
+        if not sheet_headers:
+            return df, start, False
+
+        if include_index:
+            df = df.reset_index()
+
+        mapping = match_columns_to_headers(
+            df.columns,
+            sheet_headers,
+            sample_rows=df.head().astype(str).values.tolist(),
+            use_ai=match_columns,
+        )
+        source = {
+            header: column for column, header in mapping.items() if header is not None
+        }
+
+        # Numbered columns, because a sheet is free to repeat a header name and
+        # positions are all that matter once the values are written out.
+        columns = [
+            df[source[header]].tolist() if header in source else [None] * len(df)
+            for header in sheet_headers
+        ]
+        aligned = pd.DataFrame(list(zip(*columns)), columns=range(len(sheet_headers)))
+
+        return aligned, (len(existing) + 1, start[COL]), True
 
     def _merge_index(self, start, index, other_axis_size, axis):
         """
