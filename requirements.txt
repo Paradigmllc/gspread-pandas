@@ -1,6 +1,7 @@
 # Reqs
 gspread>=6.0.0, <7
-pandas>=0.20.0
+# 2.0 for to_datetime(format="mixed"), used by convert_types
+pandas>=2.0.0
 decorator
 google-auth
 google-auth-oauthlib

@@ -33,6 +33,7 @@ setup(
         "interact with worksheets through Pandas DataFrames."
     ),
     long_description=long_description,
+    long_description_content_type="text/x-rst",
     url="https://github.com/Paradigmllc/gspread-pandas",
     download_url="https://github.com/Paradigmllc/gspread-pandas/tarball/v" + __version__,
     license="BSD",
