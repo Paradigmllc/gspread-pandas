@@ -9,6 +9,17 @@ and this project adheres to `Semantic Versioning <http://semver.org/>`_.
 [Unreleased]
 ------------
 
+[4.0.0] - 2026-08-07
+-----------------------------
+
+Breaking
+--------
+
+- Requires gspread 6. ``Client.auth`` is now ``Client.http_client.auth``,
+  following gspread's move of HTTP execution into a separate ``HTTPClient``
+- Requires Python 3.9. gspread 6 needs 3.8 and pandas 2 needs 3.9, so the
+  older versions the package still advertised could not have worked
+
 Added
 -----
 
