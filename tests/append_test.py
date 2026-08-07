@@ -67,9 +67,7 @@ def test_missing_column_is_left_blank():
 
 def test_unknown_column_is_dropped_rather_than_shifting_the_row():
     spread = make_spread(EXISTING)
-    df = pd.DataFrame(
-        [[3, "carol", 30, "JP"]], columns=HEADERS + ["Shipping Country"]
-    )
+    df = pd.DataFrame([[3, "carol", 30, "JP"]], columns=HEADERS + ["Shipping Country"])
 
     aligned, _, _ = align(spread, df)
 

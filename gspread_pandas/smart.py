@@ -1,27 +1,31 @@
 """
-Column matching for appending a DataFrame to a sheet that already has headers.
+Making sense of sheets that don't match the shape the caller assumed.
 
-Real sheets drift: a column gets renamed between exports, someone reorders
-them, a new one shows up mid-quarter. Appending positionally silently writes
-values under the wrong header, so every append resolves names instead.
-
-Matching runs in three passes, cheapest first, and each pass only sees what the
-previous one could not place:
+:func:`match_columns` lines a DataFrame up with the headers already in a sheet,
+for appending. Real sheets drift: a column gets renamed between exports,
+someone reorders them, a new one shows up mid-quarter. Appending positionally
+silently writes values under the wrong header, so every append resolves names
+instead. Matching runs in three passes, cheapest first, and each pass only sees
+what the previous one could not place:
 
 1. exact match once case, whitespace and punctuation are normalized
 2. the configured model, if :data:`GSPREAD_PANDAS_AI_API_KEY` is set
 3. difflib similarity
 
-The model is asked for a name-to-name mapping and nothing else, and anything it
-returns that is not a pair of names actually present is discarded, so a wrong or
-hostile answer can only ever fail to match a column.
+:func:`detect_structure` finds where the table actually starts in a sheet that
+opens with a title, a blank row, or a note to the team.
+
+In both cases the model is asked only for a small structured answer, and any
+part of it that doesn't describe something really present is discarded, so a
+wrong or hostile answer degrades to the non-AI result rather than corrupting
+one.
 """
 
 from difflib import SequenceMatcher
 
 from gspread_pandas import ai
 
-__all__ = ["match_columns", "normalize_name"]
+__all__ = ["match_columns", "normalize_name", "detect_structure"]
 
 # Below this, difflib pairings are noise -- "date" and "rate" score 0.75.
 SIMILARITY_CUTOFF = 0.8
@@ -150,3 +154,81 @@ def _match_with_ai(unmatched, available, sample_rows, already_mapped):
         taken.add(header)
 
     return confirmed
+
+
+_STRUCTURE_INSTRUCTIONS = (
+    "You are locating the table inside a spreadsheet that may open with a "
+    "title, a blank row, or a note before the real header row. Given the first "
+    "rows of the sheet, say which 1-based row the header starts on and how "
+    "many rows the header spans (more than one for stacked or grouped "
+    'headers). Reply with {"start_row": <int>, "header_rows": <int>}.'
+)
+
+
+def detect_structure(values, use_ai=None):
+    """
+    Find where the table starts in a sheet with preamble rows.
+
+    Parameters
+    ----------
+    values : list
+        rows of the worksheet, as returned by ``get_all_values()``
+    use_ai : bool
+        optional, force the model on or off; by default it is used whenever
+        :data:`GSPREAD_PANDAS_AI_API_KEY` is set (default None)
+
+    Returns
+    -------
+    dict
+        ``start_row``, the 1-based row the header begins on, and
+        ``header_rows``, how many rows it spans
+    """
+    guess = _detect_structure_heuristic(values)
+
+    if use_ai is None:
+        use_ai = ai.is_enabled()
+    if use_ai:
+        refined = _detect_structure_with_ai(values, guess)
+        if refined is not None:
+            return refined
+
+    return guess
+
+
+def _detect_structure_heuristic(values):
+    """First row holding two or more values is the header, anything above is
+    preamble.
+
+    Stacked headers are left to the model, since telling a second header row
+    apart from the first data row needs to read the values as meaning.
+    """
+    for ix, row in enumerate(values):
+        if sum(1 for cell in row if str(cell).strip()) >= 2:
+            return {"start_row": ix + 1, "header_rows": 1}
+
+    return {"start_row": 1, "header_rows": 1}
+
+
+def _detect_structure_with_ai(values, guess):
+    """Let the model refine the guess, rejecting anything out of bounds."""
+    response = ai.ask_json(
+        _STRUCTURE_INSTRUCTIONS,
+        {"rows": ai.sample_rows(values), "heuristic_guess": guess},
+    )
+    if not response:
+        return None
+
+    try:
+        start_row = int(response["start_row"])
+        header_rows = int(response["header_rows"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    # A header that starts before the sheet does, or swallows every row and
+    # leaves no data behind, is not an answer worth having.
+    if start_row < 1 or header_rows < 1:
+        return None
+    if start_row + header_rows > len(values):
+        return None
+
+    return {"start_row": start_row, "header_rows": header_rows}

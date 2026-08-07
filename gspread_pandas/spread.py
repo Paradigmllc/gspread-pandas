@@ -12,6 +12,7 @@ from gspread.exceptions import (
 )
 from gspread.utils import ValueInputOption, ValueRenderOption, fill_gaps, rightpad
 
+from gspread_pandas.clean import convert_types as convert_column_types
 from gspread_pandas.client import Client
 from gspread_pandas.conf import default_scope
 from gspread_pandas.exceptions import (
@@ -19,7 +20,10 @@ from gspread_pandas.exceptions import (
     MissMatchException,
     NoWorksheetException,
 )
-from gspread_pandas.smart import match_columns as match_columns_to_headers
+from gspread_pandas.smart import (
+    detect_structure,
+    match_columns as match_columns_to_headers,
+)
 from gspread_pandas.util import (
     COL,
     ROW,
@@ -362,6 +366,8 @@ class Spread:
         formula_columns=None,
         sheet=None,
         dropna=True,
+        detect_layout=False,
+        convert_types=False,
     ):
         """
         Pull a worksheet into a DataFrame.
@@ -386,6 +392,22 @@ class Spread:
             (default None)
         dropna : bool
             whether to remove rows where everything is null (default True)
+        detect_layout : bool
+            whether to work out ``start_row`` and ``header_rows`` from the
+            sheet instead of using the values passed in, for sheets that open
+            with a title or a blank row before the table. Uses the configured
+            model when ``GSPREAD_PANDAS_AI_API_KEY`` is set and falls back to
+            skipping preamble rows otherwise, see
+            :func:`detect_structure <gspread_pandas.smart.detect_structure>`
+            (default False)
+        convert_types : bool
+            whether to give columns their real types instead of leaving
+            everything as strings. A column is only converted when every
+            non-empty value in it converts cleanly. Uses the configured model
+            for columns strict inference can't place when
+            ``GSPREAD_PANDAS_AI_API_KEY`` is set, see
+            :func:`convert_types <gspread_pandas.clean.convert_types>`
+            (default False)
 
         Returns
         -------
@@ -395,6 +417,12 @@ class Spread:
         self._ensure_sheet(sheet)
 
         vals = self.sheet.get_all_values()
+
+        if detect_layout:
+            layout = detect_structure(vals)
+            start_row = layout["start_row"]
+            header_rows = layout["header_rows"] if header_rows else header_rows
+
         vals = self._fix_merge_values(vals)[start_row - 1 :]
 
         col_names = parse_sheet_headers(vals, header_rows)
@@ -431,6 +459,9 @@ class Spread:
             )
 
         df = set_col_names(df, col_names)
+
+        if convert_types:
+            df = convert_column_types(df)
 
         return parse_sheet_index(df, index)
 
