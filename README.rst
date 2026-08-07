@@ -10,21 +10,13 @@ Getting Started
         :target: https://gspread-pandas.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-author: Diego Fernandez
+created by Diego Fernandez
 
 Links:
 
 -  `Documentation <http://gspread-pandas.readthedocs.io/>`_
--  `Source code <https://github.com/aiguofer/gspread-pandas>`_
+-  `Source code <https://github.com/Paradigmllc/gspread-pandas>`_
 -  `Short video tutorial <https://youtu.be/2yIcNYzfzPw>`_
-
-.. attention:: Looking for maintainer
-
-   I don't really use this package anymore and with my current lifestyle I don't
-   have much time to maintain this project. The library as-is only supports
-   gspread version <6. Updating this to support v6 might involve a fair bit of work
-   which I unfortunately cant do. I'm happy to work with anyone who might want to
-   maintain, or I can still accept PRs.
 
 
 Overview
@@ -58,6 +50,56 @@ Some key goals/features:
 -  When pushing DataFrames with MultiIndex columns, allow merging or flattening headers
 -  Ability to handle Spreadsheet permissions
 -  Ability to specify ``ValueInputOption`` and ``ValueRenderOption`` for specific columns
+-  Append to a sheet, matching columns to the headers already there
+-  Find where the table starts in a sheet that opens with a title or a blank row
+-  Give columns their real dtypes instead of returning everything as strings
+
+
+Working with messy sheets
+=========================
+
+Sheets that people actually maintain drift. A column gets renamed between
+exports, someone adds a title row above the table, every value arrives as text.
+Three options handle that, and all of them work with no configuration at all.
+
+``convert_types`` gives columns their real dtypes. A column is only converted
+when *every* non-empty value in it converts cleanly, so a column that is 99%
+numbers and one ``N/A`` stays as text rather than quietly nulling that row::
+
+    df = spread.sheet_to_df(convert_types=True)
+
+``detect_layout`` finds where the table starts, for sheets that open with a
+report title, a blank row, or a note to the team::
+
+    df = spread.sheet_to_df(detect_layout=True)
+
+``append`` adds rows below the data already in a sheet, matching your columns
+to the headers that are there. Reordered or renamed columns still land in the
+right place instead of being written positionally::
+
+    spread.df_to_sheet(new_rows, append=True)
+
+Optional: better matching with a model
+--------------------------------------
+
+Each of the three falls back to exact matching, similarity and strict type
+inference, which covers most sheets on its own. Set an API key and they can
+also handle renames that don't look alike (``revenue`` to ``Sales Total``),
+stacked headers, and columns whose type only makes sense from the name::
+
+    export GSPREAD_PANDAS_AI_API_KEY=...
+    export GSPREAD_PANDAS_AI_BASE_URL=https://api.deepseek.com/v1  # default
+    export GSPREAD_PANDAS_AI_MODEL=deepseek-chat                   # default
+
+Any OpenAI-compatible endpoint works, so DeepSeek, OpenAI, OpenRouter, LiteLLM
+and a local Ollama are all reachable by changing the base URL. No extra
+packages are needed.
+
+The model is only ever asked for a small structured answer: a column-to-header
+mapping, a header row number, a type name from a fixed list. Nothing it returns
+is executed, and anything naming a column, header or type that isn't really
+there is discarded. A wrong answer costs you a match, never a wrong value in a
+cell. Only column names and a bounded sample of rows are ever sent.
 
 Installation / Usage
 ====================

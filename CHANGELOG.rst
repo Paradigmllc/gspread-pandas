@@ -8,6 +8,37 @@ and this project adheres to `Semantic Versioning <http://semver.org/>`_.
 
 [Unreleased]
 ------------
+
+Added
+-----
+
+- ``append`` option for ``Spread.df_to_sheet``, adding rows below the data
+  already in a sheet and matching columns to the headers there rather than
+  writing them positionally (#86)
+- ``convert_types`` option for ``Spread.sheet_to_df``, giving columns their
+  real dtypes instead of returning everything as ``object`` (#18)
+- ``detect_layout`` option for ``Spread.sheet_to_df``, finding where the table
+  starts in a sheet that opens with a title or a blank row
+- Optional use of an OpenAI-compatible model for the harder cases of all
+  three, enabled with ``GSPREAD_PANDAS_AI_API_KEY``. Adds no dependencies,
+  and every feature works without it
+
+Changed
+-------
+
+- Support gspread 6, and require it. gspread 6 moved HTTP execution out of
+  ``Client`` into ``HTTPClient``, so ``Client.auth`` is now
+  ``Client.http_client.auth``
+
+Fixed
+-----
+
+- Rate limit auto-retry no longer silently stops retrying. It matched against
+  ``str(APIError)``, which no longer carries the status field in gspread 6
+- ``Client.expiry`` and ``http_client.login()`` no longer fail with
+  ``AttributeError``; gspread only records ``auth`` when it builds the session
+  itself, and gspread-pandas always passes one in
+
 [3.3.0] - 2024-02-13
 -----------------------------
 
