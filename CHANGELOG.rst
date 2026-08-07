@@ -9,6 +9,16 @@ and this project adheres to `Semantic Versioning <http://semver.org/>`_.
 [Unreleased]
 ------------
 
+Added
+-----
+
+- ``folder_id`` for ``Spread``, ``Spread.open`` and ``Spread.open_spread``,
+  creating the spreadsheet inside a folder rather than at the top of the
+  drive. Only applies when creating (#95)
+- ``Spread.reorder_sheets``, taking worksheets by name, index or object in
+  the order you want them. Anything left out keeps its position relative to
+  the others (#55)
+
 [4.1.0] - 2026-08-07
 -----------------------------
 

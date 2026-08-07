@@ -34,6 +34,7 @@ from gspread_pandas.util import (
     create_merge_cells_request,
     create_merge_headers_request,
     create_merge_index_request,
+    create_reorder_request,
     create_unmerge_cells_request,
     expand_all_columns,
     fillna,
@@ -98,6 +99,13 @@ class Spread:
         a list of strings. See
         :meth:`add_permissions <gspread_pandas.spread.Spread.add_permissions>`
         for the expected format
+    folder_id : str
+        optional, id of the folder to create the spreadsheet in, used only
+        alongside ``create_spread``. A path can't name every folder — one
+        shared with you may not appear in your own directory tree at all — so
+        an id is the only way to reach some of them. Get one from
+        :meth:`find_folders <gspread_pandas.client.Client.find_folders>`
+        (default None)
     """
 
     #: `(gspread.spreadsheet.Spreadsheet)` - Currently open Spreadsheet
@@ -127,13 +135,14 @@ class Spread:
         creds=None,
         client=None,
         permissions=None,
+        folder_id=None,
     ):
         if isinstance(client, Client):
             self.client = client
         else:
             self.client = Client(user, config, scope, creds)
 
-        self.open(spread, sheet, create_sheet, create_spread)
+        self.open(spread, sheet, create_sheet, create_spread, folder_id)
 
         if permissions:
             self.add_permissions(permissions)
@@ -182,7 +191,14 @@ class Spread:
             ix = self._find_sheet(self.sheet.title)[0]
             return self._spread_metadata["sheets"][ix]
 
-    def open(self, spread, sheet=None, create_sheet=False, create_spread=False):
+    def open(
+        self,
+        spread,
+        sheet=None,
+        create_sheet=False,
+        create_spread=False,
+        folder_id=None,
+    ):
         """
         Open a spreadsheet, and optionally a worksheet. See.
 
@@ -201,17 +217,21 @@ class Spread:
         create_spread : bool
             whether to create the spreadsheet if it doesn't exist,
             it wil use the ``spread`` value as the sheet title (default False)
+        folder_id : str
+            optional, id of the folder to create the spreadsheet in,
+            see :meth:`open_spread <gspread_pandas.spread.Spread.open_spread>`
+            (default None)
 
         Returns
         -------
         None
         """
-        self.open_spread(spread, create_spread)
+        self.open_spread(spread, create_spread, folder_id)
 
         if sheet is not None:
             self.open_sheet(sheet, create_sheet)
 
-    def open_spread(self, spread, create=False):
+    def open_spread(self, spread, create=False, folder_id=None):
         """
         Open a spreadsheet. Authorized user must already have read access.
 
@@ -222,6 +242,12 @@ class Spread:
         create : bool
             whether to create the spreadsheet if it doesn't exist,
             it wil use the ``spread`` value as the sheet title (default False)
+        folder_id : str
+            optional, id of the folder to create the spreadsheet in. Only
+            applies when the spreadsheet is created; opening an existing one
+            ignores it. Get an id from
+            :meth:`find_folders <gspread_pandas.client.Client.find_folders>`
+            (default None)
 
         Returns
         -------
@@ -243,7 +269,7 @@ class Spread:
         except (SpreadsheetNotFound, NoValidUrlKeyFound, APIError) as error:
             if create:
                 try:
-                    self.spread = self.client.create(spread)
+                    self.spread = self.client.create(spread, folder_id=folder_id)
                     self.refresh_spread_metadata()
                 except Exception as e:
                     msg = "Couldn't create spreadsheet.\n" + str(e)
@@ -607,6 +633,48 @@ class Spread:
             the Worksheet by the given name or None if not found
         """
         return self._find_sheet(sheet)[1]
+
+    def reorder_sheets(self, order):
+        """
+        Move worksheets into the given order.
+
+        Parameters
+        ----------
+        order : list
+            worksheets, by name, index or ``Worksheet``, in the order you want
+            them. Worksheets you leave out keep their positions relative to
+            each other and follow the ones you named.
+
+        Returns
+        -------
+        None
+        """
+        moving = []
+        for sheet in order:
+            worksheet = self.sheets[sheet] if isinstance(sheet, int) else None
+            worksheet = worksheet or self.find_sheet(sheet)
+            if worksheet is None:
+                raise NoWorksheetException("Worksheet not found: {}".format(sheet))
+            if worksheet.id in [w.id for w in moving]:
+                raise ValueError("Worksheet listed twice: {}".format(sheet))
+            moving.append(worksheet)
+
+        if not moving:
+            return
+
+        # Each move is applied in turn and shifts everything after it, so
+        # assigning final positions in order lands every sheet where it belongs
+        # without having to work out the intermediate shuffling.
+        self.spread.batch_update(
+            {
+                "requests": [
+                    create_reorder_request(worksheet.id, index)
+                    for index, worksheet in enumerate(moving)
+                ]
+            }
+        )
+
+        self.refresh_spread_metadata()
 
     def clear_sheet(self, rows=1, cols=1, sheet=None):
         """
@@ -1106,14 +1174,15 @@ class Spread:
         The format should be:
         ``<id>|(<group>)|(<role>)|(<notify>)|(<require_link>)`` where:
 
-        <id> - email address of group or individual, domain, or 'anyone'
-        <group> - optional, if the id is a group e-mail, this needs to be 'group' or
-            'grp'
-        <role> - optional, one of 'owner', 'writer', or 'reader'. If ommited, 'reader'
-            will be used
-        <notify> - optional, if you don't want to notify the user, pass 'no' or 'false'
-        <require_link> - optional, if you want to require the user to have the link,
-            pass 'link'
+        - ``<id>`` - email address of group or individual, domain, or 'anyone'
+        - ``<group>`` - optional, if the id is a group e-mail, this needs to be
+          'group' or 'grp'
+        - ``<role>`` - optional, one of 'owner', 'writer', or 'reader'. If ommited,
+          'reader' will be used
+        - ``<notify>`` - optional, if you don't want to notify the user, pass 'no'
+          or 'false'
+        - ``<require_link>`` - optional, if you want to require the user to have
+          the link, pass 'link'
 
         For example, to allow anyone with a link in the group admins@example.com to
         write when they have a link, but without sending a notification to the group:

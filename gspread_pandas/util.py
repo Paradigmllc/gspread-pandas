@@ -207,6 +207,16 @@ def create_frozen_request(sheet_id, rows=None, cols=None):
     }
 
 
+def create_reorder_request(sheet_id, index):
+    """Create v4 API request to move a worksheet to a given position."""
+    return {
+        "update_sheet_properties": {
+            "properties": {"sheet_id": sheet_id, "index": index},
+            "fields": "index",
+        }
+    }
+
+
 def fillna(df, fill_value=""):
     """
     Replace null values with `fill_value`.
