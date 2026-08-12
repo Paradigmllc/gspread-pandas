@@ -6,17 +6,35 @@ Getting Started
         :target: https://pypi.python.org/pypi/gspread-pandas
         :alt: PyPI Version
 
-.. image:: https://readthedocs.org/projects/gspread-pandas/badge/?version=latest
-        :target: https://gspread-pandas.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
+.. image:: https://github.com/Paradigmllc/gspread-pandas/actions/workflows/python-package.yml/badge.svg
+        :target: https://github.com/Paradigmllc/gspread-pandas/actions/workflows/python-package.yml
+        :alt: Lint & Test
 
-created by Diego Fernandez
+.. image:: https://img.shields.io/pypi/pyversions/gspread-pandas.svg
+        :target: https://pypi.python.org/pypi/gspread-pandas
+        :alt: Supported Python versions
+
+.. image:: https://img.shields.io/pypi/l/gspread-pandas.svg
+        :target: https://github.com/Paradigmllc/gspread-pandas/blob/master/LICENSE.rst
+        :alt: BSD 3-Clause
+
+created by Diego Fernandez, maintained by `Paradigm LLC <https://paradigmjp.com>`_
+
+Requires Python 3.9+, gspread 6, and pandas 2 or 3.
 
 Links:
 
--  `Documentation <http://gspread-pandas.readthedocs.io/>`_
 -  `Source code <https://github.com/Paradigmllc/gspread-pandas>`_
--  `Short video tutorial <https://youtu.be/2yIcNYzfzPw>`_
+-  `Changelog <https://github.com/Paradigmllc/gspread-pandas/blob/master/CHANGELOG.rst>`_
+-  `Short video tutorial <https://youtu.be/2yIcNYzfzPw>`_ (from 2017 — the concepts hold, the API has moved on)
+
+.. note::
+
+   `gspread-pandas.readthedocs.io <https://gspread-pandas.readthedocs.io/>`_
+   is still serving the 3.2.2 docs from 2023. The project there is being
+   transferred from the original author and still builds from his repository.
+   Until that lands, this file and the ``docs/`` directory are the current
+   documentation.
 
 
 Overview
@@ -53,6 +71,8 @@ Some key goals/features:
 -  Append to a sheet, matching columns to the headers already there
 -  Find where the table starts in a sheet that opens with a title or a blank row
 -  Give columns their real dtypes instead of returning everything as strings
+-  Create a spreadsheet straight into a Drive folder
+-  Reorder the worksheets in a spreadsheet
 
 
 Working with messy sheets
@@ -131,7 +151,7 @@ the tool and generate credentials. Please use your web browser and go to
 -  Choose **Create Project** in popup menu on the top.
 -  A dialog box appears, so give your project a name and click on
    **Create** button.
--  On the left-side menu click on **API Manager**.
+-  On the left-side menu click on **APIs & Services**.
 -  A table of available APIs is shown. Switch **Drive API** and click on
    **Enable API** button. Do the same for **Sheets API**. Other APIs might
    be switched off, for our purpose.
@@ -208,23 +228,6 @@ Example
 
 Troubleshooting
 ===============
-
-EOFError in Rodeo
------------------
-
-If you're trying to use ``gspread_pandas`` from within
-`Rodeo <https://www.yhat.com/products/rodeo>`_ you might get an
-``EOFError: EOF when reading a line`` error when trying to pass in the verification
-code. The workaround for this is to first verify your account in a regular shell.
-Since you're just doing this to get your Oauth token, the spreadsheet doesn't need
-to be valid. Just run this in shell:
-
-.. code:: python
-
-   python -c "from gspread_pandas import Spread; Spread('<user_key>','')"
-
-Then follow the instructions to create and store the OAuth creds.
-
 
 This action would increase the number of cells in the workbook above the limit of 10000000 cells.
 -------------------------------------------------------------------------------------------------

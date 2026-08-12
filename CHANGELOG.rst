@@ -9,6 +9,20 @@ and this project adheres to `Semantic Versioning <http://semver.org/>`_.
 [Unreleased]
 ------------
 
+[4.2.1] - 2026-08-07
+-----------------------------
+
+Fixed
+-----
+
+- Removed a troubleshooting section for Rodeo, an editor discontinued years
+  ago whose link no longer resolves
+- README now lists what the package requires, carries CI and Python-version
+  badges, and covers the options added in 4.0-4.2
+- Google's console instructions said "API Manager", renamed to
+  "APIs & Services" some years back
+- Docs build without Sphinx warnings
+
 [4.2.0] - 2026-08-07
 -----------------------------
 
