@@ -24,17 +24,19 @@ Requires Python 3.9+, gspread 6, and pandas 2 or 3.
 
 Links:
 
+-  `Documentation <https://paradigmllc.github.io/gspread-pandas/>`_
 -  `Source code <https://github.com/Paradigmllc/gspread-pandas>`_
 -  `Changelog <https://github.com/Paradigmllc/gspread-pandas/blob/master/CHANGELOG.rst>`_
 -  `Short video tutorial <https://youtu.be/2yIcNYzfzPw>`_ (from 2017 — the concepts hold, the API has moved on)
 
 .. note::
 
-   `gspread-pandas.readthedocs.io <https://gspread-pandas.readthedocs.io/>`_
-   is still serving the 3.2.2 docs from 2023. The project there is being
-   transferred from the original author and still builds from his repository.
-   Until that lands, this file and the ``docs/`` directory are the current
-   documentation.
+   The docs moved. `gspread-pandas.readthedocs.io
+   <https://gspread-pandas.readthedocs.io/>`_ is still serving the 3.2.2 docs
+   from 2023 — that project is still owned by the original maintainer and
+   still builds from his repository, so it can't be updated from here. Use
+   `paradigmllc.github.io/gspread-pandas
+   <https://paradigmllc.github.io/gspread-pandas/>`_ instead.
 
 
 Overview
