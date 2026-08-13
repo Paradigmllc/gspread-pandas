@@ -39,6 +39,11 @@ extensions = [
     "sphinx.ext.intersphinx",
 ]
 
+# The changelog repeats "Added", "Fixed" and "Changed" under every release, and
+# autosectionlabel would make each one a label and then warn about every
+# collision. Only label top-level sections, which are the ones worth linking to.
+autosectionlabel_maxdepth = 1
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
