@@ -29,6 +29,8 @@ default_scope = [
 
 CONFIG_DIR_ENV_VAR = "GSPREAD_PANDAS_CONFIG_DIR"
 
+OAUTH_SERVER_PORT_ENV_VAR = "GSPREAD_PANDAS_OAUTH_SERVER_PORT"
+
 
 def get_config_dir():
     """
@@ -39,6 +41,15 @@ def get_config_dir():
     ~/.config/gspread_pandas
     """
     return Path(environ.get(CONFIG_DIR_ENV_VAR, _default_dir))
+
+
+def get_oauth_server_port() -> int:
+    """
+    Get the port which the OAuth server will be run on.
+    This might need to be overridden with an env var
+    if that port is unavailable.
+    """
+    return int(environ.get(OAUTH_SERVER_PORT_ENV_VAR) or 8182)
 
 
 def ensure_path(full_path):
@@ -169,7 +180,7 @@ def get_creds(
         flow = InstalledAppFlow.from_client_config(config, scope)
         creds = flow.run_local_server(
             host="localhost",
-            port=8182,
+            port=get_oauth_server_port(),
             authorization_prompt_message="Please visit this URL: {url}",
             success_message="The auth flow is complete; you may close this window.",
             open_browser=False,
