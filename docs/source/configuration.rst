@@ -71,3 +71,6 @@ When using a Service Account, the ``user`` param will be ignored in ``Client``, 
 creds subdirectory. If you generate your credentials elsewhere, you can pass them in to a ``Client``
 or ``Spread``. You can also run through the flow to get OAuth2 and avoid saving them by calling
 ``get_creds`` directly. You can also override the ``creds_dir`` if you call this function.
+
+If the default local port used for the OAuth flow is not accessible, a different port can be used
+by setting the ``GSPREAD_PANDAS_OAUTH_SERVER_PORT`` env variable.
