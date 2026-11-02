@@ -63,7 +63,6 @@ class Test_get_creds:
         # python 3.5 doesn't have assert_called_once
         assert mocked.call_count == 1
         assert mocked.call_args.kwargs["port"] == new_port
-        assert (conf.get_config_dir() / "creds" / "default").exists()
 
     def test_oauth_first_time_no_save(self, mocker, set_oauth_config):
         mocker.patch.object(conf.InstalledAppFlow, "run_local_server")

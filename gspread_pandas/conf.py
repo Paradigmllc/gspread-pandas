@@ -1,3 +1,4 @@
+import errno
 import json
 import sys
 from os import environ, name
@@ -199,6 +200,10 @@ def get_creds(
             creds_file.write_text(decode(json.dumps(creds_data)))
 
         return creds
-    except Exception:
+    except Exception as e:
+        if isinstance(e, OSError) and e.errno == errno.EADDRINUSE:
+            raise ConfigException(
+                f"Port {get_oauth_server_port()} is already in use. Set the {OAUTH_SERVER_PORT_ENV_VAR} environment variable to use a different port."
+            ) from e
         exc_info = sys.exc_info()
         raise ConfigException(*exc_info[1:])
